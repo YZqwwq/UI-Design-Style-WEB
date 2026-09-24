@@ -8,23 +8,26 @@
   <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
-  <aside class="sidebar">
-    <a class="brand" href="/" aria-label="设计图鉴首页"><span class="brand-mark">a<span>•</span></span><span>设计图鉴<small>DESIGN ATLAS</small></span></a>
-    <p class="nav-label">你的设计参考库</p>
-    <nav id="categories" aria-label="设计分类"></nav>
-    <div class="sidebar-note"><span class="small-mark">↗</span><strong>从灵感，到实现</strong><p>选一种设计语言，<br>带着提示词开始创作。</p></div>
-    <footer>为每一个好想法，找到样子。<span>LOCAL EDITION / 01</span></footer>
-  </aside>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="topbar">
+        <a class="brand" href="/" aria-label="设计图鉴首页">设计图鉴</a>
+        <label class="search"><input id="search" type="search" placeholder="搜索风格、颜色、关键词" aria-label="搜索设计" autocomplete="off"></label>
+      </div>
+      <nav id="categories" aria-label="设计分类"></nav>
+      <div class="filter-row">
+        <span class="filter-label">风格</span>
+        <div id="tags" role="group" aria-label="风格标签"></div>
+        <div class="filter-summary"><span id="count" role="status" aria-live="polite"></span><button id="reset" class="text-button" hidden>清除筛选</button></div>
+      </div>
+    </div>
+  </header>
   <main>
-    <header class="topbar"><span>灵感工作台 <span class="slash">/</span> <strong>风格探索</strong></span><span class="edition"><i></i> 精选设计语言</span></header>
-    <section class="intro"><div><p class="eyebrow">EXPLORE THE POSSIBILITIES</p><h1>下一种设计，<span>从这里开始。</span></h1><p>探索不同的视觉语言，把喜欢的风格交给 AI。</p></div><span class="intro-number">Aa<span>形 · 色 · 秩序</span></span></section>
     <section class="library" aria-label="设计库">
-      <div class="toolbar"><div><h2 id="collection-title">全部设计</h2><span id="count"></span></div><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜索风格、颜色、关键词…" aria-label="搜索设计"><kbd>/</kbd></label></div>
-      <div class="filter-row"><span>风格标签</span><div id="tags" role="group" aria-label="风格标签"></div><button id="reset" class="text-button">重置筛选 ↺</button></div>
+      <h1 id="collection-title" class="visually-hidden">全部设计</h1>
       <div id="grid" class="grid"></div>
-      <div id="empty" class="empty" hidden><span>∅</span><h3>还没有符合条件的设计</h3><p>试试其他关键词，或清除筛选重新探索。</p><button id="empty-reset" class="primary">查看全部设计</button></div>
+      <div id="empty" class="empty" hidden><h2>没有符合条件的设计</h2><p>试试其他关键词，或清除筛选。</p><button id="empty-reset" class="primary">查看全部设计</button></div>
     </section>
-    <footer class="main-footer"><span>好的设计，有迹可循。</span><span>精心编写的示例 · 可直接复制的提示词</span></footer>
   </main>
   <dialog id="detail" aria-labelledby="detail-title"><div class="detail-top"><span>DESIGN RECIPE / 设计配方</span><button id="close" class="icon-button" aria-label="关闭详情">×</button></div><div id="detail-content"></div></dialog>
   <div id="toast" role="status" aria-live="polite"></div>

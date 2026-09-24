@@ -3,7 +3,6 @@ import { designs, filterDesigns, buildPrompt } from './catalog.js';
 const $ = selector => document.querySelector(selector);
 const state = { category: '全部设计', tag: '全部', query: '' };
 const categories = ['全部设计', ...new Set(designs.map(d => d.category))];
-const symbols = ['◈', '◻', '✳', '◉', '⌘', '◷', '▦'];
 let selected;
 let toastTimer;
 
@@ -24,13 +23,14 @@ function notify(message) {
 }
 
 function render() {
-  $('#categories').innerHTML = categories.map((category, index) => `<button class="nav-item ${state.category === category ? 'active' : ''}" data-category="${category}" aria-pressed="${state.category === category}"><span class="nav-symbol">${symbols[index]}</span>${category}<small>${category === '全部设计' ? designs.length : designs.filter(d => d.category === category).length}</small></button>`).join('');
+  $('#categories').innerHTML = categories.map(category => `<button class="nav-item ${state.category === category ? 'active' : ''}" data-category="${category}" aria-pressed="${state.category === category}">${category}</button>`).join('');
   $('#tags').innerHTML = ['全部', '简洁', '大胆', '通透', '理性', '暗色', '复古'].map(tag => `<button data-tag="${tag}" class="tag ${state.tag === tag ? 'active' : ''}" aria-pressed="${state.tag === tag}">${tag}</button>`).join('');
   const filtered = filterDesigns(state);
   $('#collection-title').textContent = state.category;
   $('#count').textContent = `${filtered.length} 个设计`;
+  $('#reset').hidden = state.category === '全部设计' && state.tag === '全部' && !state.query;
   $('#empty').hidden = filtered.length !== 0;
-  $('#grid').innerHTML = filtered.map(d => `<article class="design-card"><button class="preview-trigger" data-open="${d.id}" aria-label="查看${d.name}设计与提示词">${preview(d)}<span class="preview-overlay">探索设计 ↗</span></button><div class="card-info"><div class="card-heading"><h3><button data-open="${d.id}">${d.name}</button></h3><span class="swatches" aria-label="配色：${d.colors.join('、')}">${d.colors.map(c => `<i style="--swatch:${c}"></i>`).join('')}</span></div><p>${d.english}</p><div class="card-bottom"><span>${d.category}<i>·</i>${d.tag}</span><button data-copy="${d.id}" aria-label="复制${d.name}提示词">复制提示词 <span aria-hidden="true">↗</span></button></div></div></article>`).join('');
+  $('#grid').innerHTML = filtered.map(d => `<article class="design-card"><button class="preview-trigger" data-open="${d.id}" aria-label="查看${d.name}设计与提示词">${preview(d)}<span class="preview-overlay">探索设计 ↗</span></button><div class="card-info"><div class="card-heading"><h3><button data-open="${d.id}">${d.name}</button></h3><span class="swatches" aria-label="配色：${d.colors.join('、')}">${d.colors.map(c => `<i style="--swatch:${c}"></i>`).join('')}</span></div><div class="card-bottom"><span>${d.category}<i>·</i>${d.tag}</span><button data-copy="${d.id}" aria-label="复制${d.name}提示词">复制提示词</button></div></div></article>`).join('');
 }
 
 function openDetail(id) {
