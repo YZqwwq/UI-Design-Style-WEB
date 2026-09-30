@@ -1,6 +1,8 @@
 <!-- project-manager:begin -->
 ## Project Manager 协作约定
 
+本仓库使用 npm workspaces。根目录 `.project-manager/` 统一管理 `apps/web` 前端与 `apps/api` 后端的规则、skills 和文档，不在应用目录建立平行的项目管理副本。按任务范围加载其中对应规则；前端设计规则不适用于纯后端逻辑。
+
 ### 文本规则的加载与退出
 
 根据当前任务的目标、操作对象和仍在进行的工作，语义匹配下表中的适用范围，读取相关文本规则。规则是轻量的项目方向补充，不是完整执行方案。
@@ -12,9 +14,17 @@
 | 领域 | 适用范围与有效期 | 规则文件 |
 | --- | --- | --- |
 | 规则编写 | 创建、修改或审阅文本规则时；长期适用 | `.project-manager/rule/README.md` |
-| 前端设计 | 所有前端页面、组件和交互的设计、开发、修改与审阅；长期适用 | `.project-manager/rule/frontend-design.md` |
+| 前端设计 | 所有前端页面、组件和交互的设计、开发、修改与审阅，包含页面区域职责划分；长期适用 | `.project-manager/rule/frontend-design.md` |
 
 规则统一放在 `.project-manager/rule/`，不从项目技术栈自行推导用户偏好。
+
+### 规则挂载管理
+
+- 开始或切换任务领域时，运行 `npm run rules -- status`，按上表语义选择规则，再通过 `npm run rules -- activate --task <任务ID> --rules <规则ID列表>` 写入下方专用生成区，并读取该区。规则 ID、路径和退出条件登记在 `.project-manager/rule-manager/registry.json`；命令说明见 `.project-manager/rule-manager/README.md`。
+- 同一任务使用固定且可区分的 ID；`activate` 替换该任务的完整规则集，不影响其他任务。只应用当前任务匹配的规则，其他并行任务挂载的规则不自动扩展当前任务范围。
+- 任务结束时执行 `npm run rules -- finish --task <任务ID>`；退出部分领域时用 `activate` 更新剩余规则。临时提问不结束仍在进行的任务。过期记录通过 `prune` 或任意写入命令清理；没有后台定时器。
+- 源规则变更后执行 `sync` 并重新读取；状态不一致先检查差异，不直接覆盖。仅编辑规则源文件，不手改生成区。增加或取消规则登记时同步维护注册表和上方地图。
+- 卸载后停止使用该规则；脚本不能清除会话中已经读取的内容，也不保证宿主自动重新加载 `AGENTS.md`。无法运行脚本时报告原因，仍按适用范围直接读取源文件，不声称挂载成功。
 
 ### 按需 Skills
 
@@ -31,3 +41,7 @@
 
 临时补充不自动成为长期规则。持久化或改变规则范围需符合用户当前要求和已有授权；已有授权不重复询问。路径缺失或规则冲突时说明具体情况，遵循宿主指令优先级和工具权限。
 <!-- project-manager:end -->
+
+<!-- project-rules:active:begin -->
+<!-- 由 rules.mjs 生成，只修改源文件；卸载规则后停止适用。 -->
+<!-- project-rules:active:end -->

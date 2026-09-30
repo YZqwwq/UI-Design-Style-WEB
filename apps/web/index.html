@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="个人设计收集库，浏览收藏的设计风格与界面配方。">
+  <title>设计图鉴 · Design Atlas</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="设计图鉴首页">设计图鉴</a>
+    <label class="search"><input id="search" type="search" maxlength="200" placeholder="搜索风格、颜色、关键词" aria-label="搜索设计" autocomplete="off"></label>
+    <span id="count" role="status" aria-live="polite"></span>
+    <div class="account-controls"><button id="account" class="shell-button" title="Sign in">Sign in</button><button id="logout" class="shell-button" hidden>退出</button></div>
+  </header>
+  <div class="workspace">
+    <aside id="sidebar" class="sidebar" aria-label="设计库导航">
+      <div class="sidebar-top"><h2>设计分类</h2><button id="toggle-sidebar" class="sidebar-toggle" aria-controls="sidebar-content" aria-expanded="true" aria-label="收起分类" title="收起分类"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2.5" y="4" width="19" height="16" rx="2.5" stroke="currentColor" stroke-width="1.7"/><rect class="sidebar-icon-bar" x="5" y="6.5" width="3.5" height="11" rx="0.75" fill="currentColor"/></svg></button></div>
+      <div id="sidebar-content">
+      <div class="sidebar-section"><nav id="categories" aria-label="设计分类"></nav></div>
+      <div class="sidebar-section"><h2>风格标签</h2><div id="tags" role="group" aria-label="风格标签"></div></div>
+      <button id="reset" class="text-button" hidden>清除筛选</button>
+      </div>
+    </aside>
+  <main>
+    <section class="library" aria-label="设计库">
+      <h1 id="collection-title" class="visually-hidden">全部设计</h1>
+      <p id="load-status" class="load-status" role="status">正在加载设计…</p>
+      <div id="load-error" class="empty" role="alert" hidden><h2>暂时无法加载设计</h2><p>请检查服务连接后重试。</p><button id="retry-load" class="primary">重新加载</button></div>
+      <div id="grid" class="grid" aria-busy="true"></div>
+      <button id="load-more" class="load-more primary" hidden>加载更多</button>
+      <div id="empty" class="empty" hidden><h2>没有符合条件的设计</h2><p>试试其他关键词，或清除筛选。</p><button id="empty-reset" class="primary">查看全部设计</button></div>
+    </section>
+  </main>
+  <dialog id="detail" aria-labelledby="detail-title"><div class="detail-top"><span>设计属性</span><button id="close" class="shell-button" aria-label="关闭属性面板">关闭</button></div><div id="detail-content"></div></dialog>
+  </div>
+  <dialog id="auth-gate" class="auth-dialog" aria-label="登录设计图鉴"><div id="auth-root"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/src/app.js"></script>
+</body>
+</html>

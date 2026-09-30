@@ -3,3 +3,14 @@ node_modules/
 *.log
 
 .pro
+
+# Local environment files may contain database credentials.
+.env
+.env.*
+!.env.example
+
+# Local rule mounting state (registry and sources remain tracked).
+.project-manager/rule-manager/state.json
+.project-manager/rule-manager/state.json.tmp
+.project-manager/rule-manager/write.lock
+AGENTS.md.tmp

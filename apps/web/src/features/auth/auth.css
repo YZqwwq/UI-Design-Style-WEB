@@ -1,0 +1,62 @@
+/* Tailwind utilities only: omit Preflight so the existing gallery keeps its styling. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@source "../../components";
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-primary: var(--text);
+  --color-primary-foreground: var(--surface);
+  --color-muted-foreground: var(--muted);
+  --color-border: var(--line);
+  --color-input: var(--input-border);
+  --color-ring: var(--focus);
+}
+#auth-gate.auth-dialog{inset:0;margin:auto;width:min(1080px,calc(100vw - 48px));max-width:none;height:fit-content;max-height:calc(100dvh - 48px);padding:0;border:1px solid #ffffffa6;border-radius:24px;background:linear-gradient(150deg,#ffffffed,#f7f7f7cf 48%,#ffffffe0);backdrop-filter:blur(24px) saturate(1.15);-webkit-backdrop-filter:blur(24px) saturate(1.15);box-shadow:none;overflow-y:auto;scrollbar-width:none}
+#auth-gate.auth-dialog::-webkit-scrollbar{display:none}
+#auth-gate.auth-dialog::backdrop{background:rgba(30,30,35,.24);backdrop-filter:blur(12px) saturate(.8);-webkit-backdrop-filter:blur(12px) saturate(.8)}
+body:has(#auth-gate[open]){overflow:hidden}
+#auth-root{min-height:0}
+#auth-root .auth-page{min-height:0;background:transparent;color:var(--text);font-family:Inter,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.5}
+#auth-root .auth-art{min-height:744px;background:#f1f0ecb3;border-right:1px solid #ffffff66;padding:40px}
+/* Paired light/dark bands suggest a rounded glass edge; overlays never intercept input. */
+#auth-root .auth-page::before,#auth-root .auth-page::after{content:"";position:absolute;z-index:30;pointer-events:none}
+#auth-root .auth-page::before{inset:0;border-radius:23px;box-shadow:inset 0 1px 1px #fff,inset 0 -3px 4px #fffffff2,inset 2px 0 3px #ffffff99,inset -1px 0 2px #00000014}
+#auth-root .auth-page::after{inset:3px;border-radius:20px;box-shadow:inset 0 4px 7px #00000012,inset 0 -5px 9px #ffffff80; background:linear-gradient(180deg,#ffffff24,transparent 9%,transparent 92%,#ffffff12)}
+#auth-root .auth-art::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#f1f0ec22 15%,transparent 40%,#f1f0ec 83%);pointer-events:none}
+#auth-root .auth-brand{font-size:22px;font-weight:650;letter-spacing:.02em}
+#auth-root .auth-brand span{display:block;font-size:10px;letter-spacing:.2em;font-weight:500;color:#6e6d67;margin-top:5px}
+#auth-root .auth-statement{padding-bottom:20px;max-width:580px}
+#auth-root .auth-eyebrow{font-size:10px;letter-spacing:.16em;font-weight:500;color:#77766f;margin:0 0 20px}
+#auth-root .auth-statement h2{font-family:Georgia,"Songti SC",serif;font-size:34px;font-weight:400;line-height:1.5;letter-spacing:-.04em;margin:0 0 22px}
+#auth-root .auth-statement em{font-style:normal}
+#auth-root .auth-statement>p:last-child{font-size:14px;line-height:1.9;color:#77766f;max-width:360px;margin:0}
+#auth-root .auth-main{min-height:744px;padding:76px 48px 44px;isolation:isolate}
+#auth-root .auth-glow{position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 95% 0%,#17171709,transparent 65%)}
+#auth-root .auth-home{position:absolute;top:16px;right:16px;z-index:20;background:transparent;display:inline-flex;gap:6px;color:#666;font-size:14px;height:36px;width:36px;padding:8px}
+#auth-root .auth-home:hover{background:#eee}
+#auth-root .auth-panel{max-width:380px}
+#auth-root .auth-panel h1{font-family:Georgia,"Times New Roman",serif;font-size:40px;font-weight:400;letter-spacing:-.045em;line-height:1.12;margin:0 0 16px}
+#auth-root .auth-intro{font-size:14px;line-height:1.8;color:var(--muted);margin:0 0 30px}
+#auth-root .auth-fields{display:flex;flex-direction:column}
+#auth-root .auth-fields label{font-size:14px;margin-bottom:9px}
+#auth-root .auth-fields input{width:100%;height:48px;border:1px solid #ffffffb3;border-radius:12px;background:linear-gradient(155deg,#ffffff80,#ffffff38 55%,#ffffff70);box-shadow:0 2px 3px #00000012,inset 0 1px 1px #ffffffed,inset 0 -2px 4px #ffffffe6,inset 0 3px 6px #00000014;padding:12px 14px;font-size:15px;color:var(--text);margin:0 0 20px;outline:none}
+#auth-root .auth-fields input::placeholder{color:#707070}
+#auth-root .auth-fields input:focus{outline:none;background:linear-gradient(155deg,#ffffffb3,#ffffff70 55%,#ffffff99)}
+#auth-root .auth-fields small{font-size:12px;color:var(--muted);line-height:1.6;margin:-12px 0 20px}
+#auth-root #auth-status{font-size:14px;line-height:1.7;margin:0 0 16px}
+#auth-root #auth-status:empty{display:none}
+#auth-root .auth-submit{background:linear-gradient(165deg,#363636,#171717 65%);border:1px solid #ffffff33;box-shadow:0 3px 7px #0000001f,inset 0 1px 1px #ffffff40,inset 0 -1px 2px #00000066;color:white;height:48px;border-radius:12px;font-size:15px;margin:4px 0 0}
+#auth-root .auth-submit:hover{background:#333}
+#auth-root .auth-submit:disabled{opacity:.6}
+#auth-root .auth-switch{display:flex;justify-content:center;align-items:center;gap:8px;font-size:14px;color:#777;margin:24px 0 0}
+#auth-root .auth-switch button{background:transparent;padding:8px 0;color:var(--text);font-size:14px;text-decoration:underline;text-underline-offset:4px}
+#auth-root .auth-note{font-size:12px;line-height:1.8;color:#888;text-align:center;margin:20px 0 0}
+#auth-root .auth-mobile-brand{font-size:12px;letter-spacing:.06em;margin-bottom:36px;color:#777}
+#auth-root .auth-enter{animation:auth-enter .55s both cubic-bezier(.22,1,.36,1)}
+@keyframes auth-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:1023px){#auth-gate.auth-dialog{width:min(552px,calc(100vw - 32px));max-height:calc(100dvh - 32px)}#auth-root .auth-main{min-height:0;padding:52px 32px 32px}#auth-root .auth-mobile-brand{margin-bottom:24px}}
+@media(max-width:380px){#auth-root .auth-main{padding-inline:22px}#auth-root .auth-panel h1{font-size:38px}}
+@media(prefers-reduced-motion:reduce){#auth-root .auth-enter,#auth-root .animate-spin{animation:none!important}}

@@ -1,4 +1,6 @@
-export const designs = [
+import type { Design } from "../../src/types.js";
+
+export const designs: Design[] = [
   { id: 'editorial', name: '留白的力量', english: 'Editorial Minimal', category: '极简主义', tag: '简洁', tone: 'editorial', colors: ['#f4f2ec', '#202020', '#be4d34'], description: '用克制的色彩与杂志式排版，让内容成为主角。', layout: '不对称双栏；宽裕留白；细线划分信息层级', typography: '标题使用衬线字体 Georgia，正文使用系统无衬线字体；标题与正文有明显字号对比', surface: '米白背景、墨黑正文、砖红点缀；1px 细线；无装饰阴影', interaction: '按钮悬停变为砖红；过渡 180ms；焦点描边清晰', use: '作品集、品牌官网、内容站', label: 'Less, but\nbetter.', subtitle: 'A journal of thoughtful things.', code: '01' },
   { id: 'brutal', name: '大胆，不设限', english: 'Neo Brutalism', category: '新粗野主义', tag: '大胆', tone: 'brutal', colors: ['#dfff00', '#191919', '#faf9f6'], description: '高对比色块、粗线条和硬阴影，表达直接的个性。', layout: '模块化卡片；粗边框；大标题占据首屏；清晰的网格', typography: '粗体无衬线标题；标签采用等宽字体；避免纤细字重', surface: '荧光黄绿与黑白；3px 实线边框；6px 6px 无模糊硬阴影；4px 圆角', interaction: '悬停平移 -2px；按下收回硬阴影；150ms 过渡', use: '创意工作室、工具网站、活动页', label: 'MAKE\nSOME NOISE.', subtitle: 'Ideas that refuse to blend in.', code: '02' },
   { id: 'glass', name: '光的层次', english: 'Glassmorphism', category: '玻璃拟态', tag: '通透', tone: 'glass', colors: ['#182146', '#9cacf6', '#f3f5ff'], description: '半透明表面与柔和光晕，构建轻盈的空间层次。', layout: '居中浮层卡片；内容分组明确；背景和前景保持层次', typography: '系统无衬线字体；中等字重；14px 以上次要标签', surface: '深蓝底；淡紫光晕；半透明白色面板；20px 背景模糊；半透明边框；20px 圆角', interaction: '悬停提高面板不透明度；避免文字和背景混色；不支持模糊时提供实色背景', use: '数据面板、音乐应用、个人主页', label: 'Your space.\nIn focus.', subtitle: 'A little clarity in the everyday.', code: '03' },
@@ -8,12 +10,3 @@ export const designs = [
   { id: 'bento', name: '模块的节奏', english: 'Bento Interface', category: '模块网格', tag: '理性', tone: 'bento', colors: ['#e7eaf0', '#292d36', '#5267da'], description: '大小有序的模块，把复杂信息整理成清晰的视图。', layout: 'Bento 不等尺寸网格；主次模块分明；移动端按阅读顺序单列重排', typography: '系统无衬线；24px 模块标题；数字采用 40px 粗体', surface: '浅灰背景；白色卡片；靛蓝强调；16px 圆角；细微边框', interaction: '可点击模块使用清晰焦点环；悬停边框加深；不让纯数据模块看起来可点击', use: '产品展示、仪表盘、个人主页', label: 'Everything.\nIn its place.', subtitle: 'A better view of your day.', code: '07' },
   { id: 'mono', name: '黑白之间', english: 'Monochrome Studio', category: '极简主义', tag: '暗色', tone: 'mono', colors: ['#242424', '#efefeb', '#999990'], description: '去掉多余色彩，用比例、文字和灰阶塑造质感。', layout: '大幅排版；水平细线；不对称信息区；每屏一个重点', typography: '无衬线极粗大标题；次级标签大写并增大字距', surface: '炭黑底色；暖白正文；中灰辅助文字；直角；无投影', interaction: '按钮悬停黑白反转；200ms 过渡；导航保持清晰文字提示', use: '建筑工作室、摄影作品集、设计品牌', label: 'Beyond\nthe ordinary.', subtitle: 'Independent minds. Shared vision.', code: '08' },
 ];
-
-export function filterDesigns({ category = '全部设计', tag = '全部', query = '' } = {}) {
-  const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  return designs.filter(d => (category === '全部设计' || d.category === category) && (tag === '全部' || d.tag === tag) && terms.every(term => `${d.name} ${d.english} ${d.category} ${d.tag} ${d.description} ${d.use} ${d.colors.join(' ')}`.toLocaleLowerCase().includes(term)));
-}
-
-export function buildPrompt(design, purpose = '') {
-  return `请为${purpose.trim() || '我的网站'}设计并实现一个「${design.name} / ${design.english}」风格的响应式界面。\n\n设计方向：${design.description}\n适合场景：${design.use}。\n\n视觉规范\n- 配色：${design.colors.join('、')}（按背景、主要文字或强调色的视觉角色使用，优先保证对比度）。\n- 布局：${design.layout}。\n- 字体：${design.typography}。\n- 表面与细节：${design.surface}。\n- 交互：${design.interaction}。\n\n实现要求\n- 将风格一致应用于导航、标题、卡片、按钮和表单；内容以实际业务需求为准。\n- 桌面和移动端均可用，窄屏合理折行且无水平溢出。\n- 使用语义化 HTML，支持键盘导航、可见焦点、可读的文字对比度；尊重 prefers-reduced-motion。\n- 为真实交互提供必要的空状态、错误提示与成功反馈。\n- 避免用不可读的装饰文字或图片代替界面；交付可运行代码。`;
-}

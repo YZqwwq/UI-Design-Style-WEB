@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "rules": {
+    "rule-writing": {
+      "path": ".project-manager/rule/README.md",
+      "scope": "创建、修改或审阅文本规则",
+      "lifetime": "任务结束或退出规则编写领域",
+      "enabled": true
+    },
+    "frontend-design": {
+      "path": ".project-manager/rule/frontend-design.md",
+      "scope": "前端页面、组件和交互的设计、开发、修改与审阅",
+      "lifetime": "任务结束或退出前端领域",
+      "enabled": true
+    }
+  }
+}
