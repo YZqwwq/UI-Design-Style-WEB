@@ -37,12 +37,12 @@
 使用 Node.js 24，仓库提供 `.nvmrc`。在仓库根目录执行：
 
 ```bash
-nvm use
-npm install
+nvm use 24.9.0
+npm ci
 npm run dev
 ```
 
-若 `nvm use` 提示版本尚未安装，先执行 `nvm install`。首次新工作副本需要复制 `.env.example` 到根目录 `.env` 并填写数据库配置；已有 `.env` 不要覆盖。新数据库初始化或升级新增 SQL 迁移时运行 `npm run db:migrate`，无需重建数据库。本轮账号迁移已在当前配置的数据库执行。
+Windows nvm 需要显式版本号；尚未安装时执行 `nvm install 24.9.0`，再运行 `nvm use 24.9.0`。也可使用已安装的其他 Node 24.x 版本。首次新工作副本需要复制 `.env.example` 到根目录 `.env` 并填写数据库配置；已有 `.env` 不要覆盖。新数据库初始化或升级新增 SQL 迁移时运行 `npm run db:migrate`，无需重建数据库。迁移应针对实际运行数据库执行；自动化测试的临时数据库不等于部署数据库。
 
 开发时浏览器打开 http://127.0.0.1:4173 。前端 Vite 使用 4173，后端 Fastify 使用 4174，`/api` 经 Vite 代理到后端。两个服务仅监听本机，根命令同时启动，Ctrl+C 同时停止。
 
@@ -103,7 +103,7 @@ WEB_PORT=5173 API_PORT=5174 npm run dev
 
 所有非只读 API 请求必须带 `X-Atlas-Request: 1`；浏览器 Origin 如存在必须匹配允许的站点源，未启用跨域 CORS。前端已统一添加此请求头。本地服务经 Vite 代理使用同源 Cookie，不需要 Redis。
 
-`user_identities` 已预留 Google/GitHub/QQ 身份绑定结构，但本轮没有实现或启用第三方授权路由；没有密码找回、密码修改或管理员账号管理页面。用户名密码由用户自行注册，不预置默认管理员。
+`user_identities` 已预留 Google/GitHub/QQ 身份绑定结构，但本轮没有实现或启用第三方授权路由；已支持修改密码并撤销全部会话、退出全部设备；尚无密码找回或管理员账号管理页面。用户名密码由用户自行注册，不预置默认管理员。
 
 ## 前端组件结构
 
@@ -114,7 +114,7 @@ WEB_PORT=5173 API_PORT=5174 npm run dev
 | 方法与路径 | 行为 |
 | --- | --- |
 | `GET /api/health` | 检查数据库与设计表可读性，正常返回 200，异常返回 503 |
-| `POST /api/auth/register` | `{ username, password }`；创建账号、复制模板并建立会话 |
+| `POST /api/auth/register` | `{ username, password, confirmation }`；后端校验确认密码，在同一事务内创建账号、复制模板并建立会话 |
 | `POST /api/auth/login` | `{ username, password }`；验证后建立会话 |
 | `POST /api/auth/logout` | 撤销当前会话并清除 Cookie |
 | `GET /api/auth/me` | 返回当前 `{ user }`，未登录时为 null |
@@ -137,6 +137,52 @@ WEB_PORT=5173 API_PORT=5174 npm run dev
 
 保留全部 8 个原创 HTML/CSS 示例、6 类设计方向，以及搜索筛选、详情、提示词编辑复制、移动端布局和键盘操作。预览不是外部网站截图；数据库文本会转义后展示，配色和预览主题按受支持格式渲染。
 
-自定义分类管理、跨风格 UI 组合编辑与保存属于后续产品方向，当前已完成前后端分离、真实数据库接入，以及开放注册和用户数据隔离；设计/分类的编辑保存界面仍待实现。
+已支持个人设计、分类和标签的新增、编辑与删除。首页品牌旁的 + 新建设计，详情中编辑当前设计，左栏管理分类和标签；点击用户名打开账号设置。跨风格 UI 组合编辑与保存尚未实现。
 
 项目管理入口为 `AGENTS.md`；实际覆盖与验证记录见 [.project-manager/document/index.md](.project-manager/document/index.md)。
+
+## 单机用户系统约定
+
+### 开发与部署数据库选择
+
+后端读取仓库根目录 `.env`，不存在时读取 `.ENV`（同时存在时优先小写文件）。同一文件中未加后缀的 `PGDATABASE`、`PGUSER`、`PGPASSWORD` 是正式配置；`PGDATABASE-test`、`PGUSER-test`、`PGPASSWORD-test` 是开发/测试配置。三个测试字段必须填写，缺失或为空不会回退正式值；测试库与正式库名称相同会拒绝开发连接。`PGHOST`、`PGPORT`、`PGSSLMODE`、`PGCONNECT_TIMEOUT` 可以共用，也可通过对应 `-test` 字段覆盖测试连接参数。
+
+| 命令 | 数据库选择 |
+| --- | --- |
+| `npm run dev`、`npm run dev:api` | 测试库（本项目为 UI-test） |
+| `npm run db:check`、`npm run db:migrate` | 测试库 |
+| `npm run test:db`、`npm run test:auth:db` | 测试库 |
+| `npm run build` | 仅构建，不连接数据库 |
+| `npm start` | 正式库（本项目为 UI）；入口带 --production |
+| `npm run db:check:prod` | 正式库，只读检查 |
+| `npm run db:migrate:prod` | 正式库迁移，部署时显式执行 |
+
+环境由启动入口明确选择，`NODE_ENV` 不会把 dev 或数据库测试切到正式库。连接检查显示实际数据库及环境，便于确认目标。开发工作区可仅保留测试凭据，生产工作区可仅保留正式凭据；数据库权限隔离仍应由远端账号权限保证。新建测试库第一次使用前需要单独运行 `npm run db:migrate`。
+
+所有用户同级，不引入管理员权限、角色分流或 Redis。会话存储于 PostgreSQL，尝试次数及账号操作并发限制保存在单个服务进程内；进程重启会重置计数，不支持多进程共享限流。后端自行验证输入、身份、归属及密码确认；前端表单不执行安全判定，仅显示后端结果。浏览器不接触数据库连接配置或 SQL，文本仍通过转义安全渲染。
+
+新增写入接口（全部要求登录和 X-Atlas-Request 请求头）：
+
+| 接口 | 行为 |
+| --- | --- |
+| POST /api/designs | 新增个人设计；name、category、tag 必填，其余字段采用后端默认值 |
+| PUT /api/designs/:id | 替换本人设计内容；分类和标签必须属于本人 |
+| DELETE /api/designs/:id | 删除本人设计 |
+| GET /api/categories、/api/tags | 读取本人的分类/标签 ID 与名称 |
+| POST /api/categories、/api/tags | 以 { name } 新增 |
+| PUT /api/categories/:id、/api/tags/:id | 以 { name } 重命名 |
+| DELETE /api/categories/:id、/api/tags/:id | 删除；仍被设计引用时返回 409 |
+| POST /api/auth/password | { currentPassword, password, confirmation }；成功后撤销全部会话 |
+| POST /api/auth/logout-all | 空对象请求体，撤销本人的全部会话 |
+
+资源归属取自后端会话，不接受 owner_id 或 role；未登录返回 401，跨用户操作返回 404。注册事务包含会话写入；数据库故障不会留下半完成账号。个人修改不更新公共模板。
+
+构建工具通过 Node 直接启动，支持 Windows 含空格和 & 的项目路径。Windows 更换端口示例：
+
+```powershell
+$env:WEB_PORT='5173'
+$env:API_PORT='5174'
+npm run dev
+```
+
+本地运行 npm test、npm run typecheck、npm run build；配置专用测试数据库并迁移后运行 npm run test:db 与 npm run test:auth:db。后者创建唯一测试账号并清理，不应用生产数据库承担测试。Windows 无文件符号链接权限时仅跳过独立链接测试，其他规则断言照常运行；Linux CI 完整执行该项及数据库集成测试。

@@ -6,34 +6,47 @@ import { repositoryRoot } from './paths.js';
 
 class ConfigurationError extends Error {}
 
-export async function loadConfig(root = repositoryRoot) {
+export type DatabaseEnvironment = 'development' | 'production';
+export async function loadConfig(root = repositoryRoot, environment: DatabaseEnvironment = 'development') {
   // Read credentials only on the server. Never include values in errors or logs.
-  const file = parse(await readFile(path.join(root, '.env')));
-  const missing = ['PGHOST', 'PGPORT', 'PGDATABASE', 'PGUSER', 'PGPASSWORD', 'PGSSLMODE'].filter(key => !file[key]);
+  if (!['development','production'].includes(environment)) throw new ConfigurationError('数据库环境无效');
+  let contents;
+  try { contents = await readFile(path.join(root, '.env')); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    contents = await readFile(path.join(root, '.ENV'));
+  }
+  const file = parse(contents);
+  const development = environment === 'development';
+  const credentialKey = (key: string) => development ? `${key}-test` : key;
+  const connectionValue = (key: string) => development ? file[`${key}-test`] ?? file[key] : file[key];
+  const missing = ['PGDATABASE', 'PGUSER', 'PGPASSWORD'].map(credentialKey).filter(key => !file[key]);
+  missing.push(...['PGHOST','PGPORT','PGSSLMODE'].filter(key => !connectionValue(key)));
   if (missing.length) throw new ConfigurationError(`数据库配置缺少：${missing.join(', ')}`);
+  if (development && file['PGDATABASE-test'] === file.PGDATABASE) throw new ConfigurationError('测试库与正式库名称相同，已拒绝连接。');
   const integer = (value: string, max: number, name: string) => {
     const number = Number(value);
     if (!Number.isInteger(number) || number < 1 || number > max) throw new ConfigurationError(`${name} 配置无效`);
     return number;
   };
-  if (!['disable', 'verify-full'].includes(file.PGSSLMODE)) throw new ConfigurationError('PGSSLMODE 仅支持 disable 或 verify-full');
+  if (!['disable', 'verify-full'].includes(connectionValue('PGSSLMODE'))) throw new ConfigurationError('PGSSLMODE 仅支持 disable 或 verify-full');
   const db: PoolConfig = {
-    host: file.PGHOST,
-    port: integer(file.PGPORT, 65535, 'PGPORT'),
-    database: file.PGDATABASE,
-    user: file.PGUSER,
-    password: file.PGPASSWORD,
-    ssl: file.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: true },
-    connectionTimeoutMillis: integer(file.PGCONNECT_TIMEOUT || '10', 120, 'PGCONNECT_TIMEOUT') * 1000,
+    host: connectionValue('PGHOST'),
+    port: integer(connectionValue('PGPORT'), 65535, 'PGPORT'),
+    database: file[credentialKey('PGDATABASE')],
+    user: file[credentialKey('PGUSER')],
+    password: file[credentialKey('PGPASSWORD')],
+    ssl: connectionValue('PGSSLMODE') === 'disable' ? false : { rejectUnauthorized: true },
+    connectionTimeoutMillis: integer(connectionValue('PGCONNECT_TIMEOUT') || '10', 120, 'PGCONNECT_TIMEOUT') * 1000,
     statement_timeout: 10000,
     query_timeout: 12000,
     idleTimeoutMillis: 30000,
     max: 5,
-    application_name: 'design-atlas',
+    application_name: `design-atlas-${environment}`,
   };
   const originValue = process.env.APP_ORIGIN || file.APP_ORIGIN;
   const servicePort = integer(process.env.PORT || file.PORT || '4173',65535,'PORT');
-  const webPort = process.argv.includes('--production') ? servicePort : integer(process.env.WEB_PORT || '4173',65535,'WEB_PORT');
+  const webPort = development ? integer(process.env.WEB_PORT || '4173',65535,'WEB_PORT') : servicePort;
   let origins = [`http://localhost:${webPort}`, `http://127.0.0.1:${webPort}`];
   if (originValue) {
     try {
@@ -43,6 +56,7 @@ export async function loadConfig(root = repositoryRoot) {
     } catch { throw new ConfigurationError('APP_ORIGIN 必须是完整站点源地址，不含路径或结尾斜杠'); }
   }
   return {
+    environment,
     origins,
     secureCookie: origins.every(origin => origin.startsWith('https://')),
     db,

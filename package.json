@@ -11,21 +11,20 @@
   ],
   "scripts": {
     "predev": "node scripts/check-runtime.mjs",
-    "dev": "concurrently --kill-others --success first --names api,web \"npm run dev:api\" \"npm run dev:web\"",
+    "dev": "node scripts/dev.mjs",
     "dev:web": "npm run dev --workspace @design-atlas/web",
     "dev:api": "npm run dev --workspace @design-atlas/api",
     "start": "npm run start --workspace @design-atlas/api",
     "build": "npm run build --workspace @design-atlas/web && npm run build --workspace @design-atlas/api",
-    "test": "npm run test:rules && npm run test --workspace @design-atlas/api",
+    "test": "npm run test:rules && npm run test --workspace @design-atlas/api && node --test apps/web/tests/*.test.mjs",
     "rules": "node .project-manager/scripts/rules.mjs",
     "test:rules": "node --test .project-manager/rule-manager/rules.test.mjs",
     "typecheck": "npm run typecheck --workspace @design-atlas/web && npm run typecheck --workspace @design-atlas/api",
     "db:check": "npm run db:check --workspace @design-atlas/api",
+    "db:check:prod": "npm run db:check --workspace @design-atlas/api -- --production",
     "db:migrate": "npm run db:migrate --workspace @design-atlas/api",
+    "db:migrate:prod": "npm run db:migrate --workspace @design-atlas/api -- --production",
     "test:db": "npm run test:db --workspace @design-atlas/api",
     "test:auth:db": "npm run test:auth:db --workspace @design-atlas/api"
-  },
-  "devDependencies": {
-    "concurrently": "^10.0.5"
   }
 }

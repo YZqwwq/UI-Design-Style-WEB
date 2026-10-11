@@ -1,7 +1,7 @@
 import net from 'node:net';
 
 if (Number(process.versions.node.split('.')[0]) !== 24) {
-  console.error(`当前 Node.js ${process.versions.node}；本项目需要 Node.js 24。请先运行 nvm use，再运行 npm run dev。`);
+  console.error(`当前 Node.js ${process.versions.node}；本项目需要 Node.js 24。请先运行 nvm use 24.9.0（或已安装的 24.x 版本），再运行 npm run dev。`);
   process.exit(1);
 }
 const ports = [Number(process.env.WEB_PORT || 4173), Number(process.env.API_PORT || 4174)];

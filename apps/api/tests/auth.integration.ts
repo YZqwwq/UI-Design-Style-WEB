@@ -20,7 +20,7 @@ test('PostgreSQL registration copies templates, isolates users and persists/revo
   const templates=(await pool.query('SELECT id,content FROM design_atlas.designs ORDER BY position,id')).rows;
   const accounts=[];
   for(const username of names){
-   const r=await app.inject({method:'POST',url:'/api/auth/register',headers,payload:{username,password}});
+   const r=await app.inject({method:'POST',url:'/api/auth/register',headers,payload:{username,password,confirmation:password}});
    assert.equal(r.statusCode,201);
    accounts.push({user:r.json().user,cookie:String(r.headers['set-cookie']).split(';')[0]});
   }

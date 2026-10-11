@@ -56,16 +56,27 @@ test('手动变更及丢失状态需显式修复', t => {
   assert.throws(() => f.exec('sync'), /不一致/);
   f.exec('sync', '--repair'); assert.ok(!f.text().includes('正文 A'));
 });
-test('拒绝错误输入、越界链接、缺失规则及重复标记', t => {
+test('拒绝错误输入、缺失规则及重复标记', t => {
   const f = fixture(t);
   assert.throws(() => f.exec('activate', '--task', 'one', '--rules', 'missing'), /不存在/);
   assert.throws(() => f.exec('activate', '--task', 'one', '--rules', 'a', '--expires-at', 'yesterday'), /ISO/);
   assert.throws(() => f.exec('sync', '--unknown'), /参数/);
-  fs.unlinkSync(path.join(f.ruleDir, 'a.md'));
-  fs.symlinkSync(f.agent, path.join(f.ruleDir, 'a.md'));
-  assert.throws(() => f.exec('activate', '--task', 'one', '--rules', 'a'), /越界/);
   fs.appendFileSync(f.agent, BEGIN);
   assert.throws(() => f.exec('sync', '--repair'), /标记/);
+});
+
+test('拒绝越界文件符号链接', t => {
+  const f = fixture(t);
+  fs.unlinkSync(path.join(f.ruleDir, 'a.md'));
+  try { fs.symlinkSync(f.agent, path.join(f.ruleDir, 'a.md')); }
+  catch (error) {
+    if (process.platform === 'win32' && error.code === 'EPERM') {
+      t.skip('Windows 当前用户无文件符号链接权限；此项必须在支持符号链接的 CI 中执行');
+      return;
+    }
+    throw error;
+  }
+  assert.throws(() => f.exec('activate', '--task', 'one', '--rules', 'a'), /越界/);
 });
 test('停用规则阻止同步，但允许释放引用；写锁阻止并发修改', t => {
   const f = fixture(t);

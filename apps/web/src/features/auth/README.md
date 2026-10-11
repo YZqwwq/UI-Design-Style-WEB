@@ -1,11 +1,11 @@
 # 独立 Sign in 组件
 
-页面保留原生设计库，登录功能以 React 组件挂载到 `index.html` 的 `#auth-root`。点击 Sign in 时动态加载 `mount.tsx` 和组件样式；居中原生 dialog 搭配半透明玻璃遮罩与背景模糊，提供焦点限制、右上角关闭按钮、Esc 返回及关闭后焦点恢复；小屏保持四周留白，内容过长时在弹窗内滚动。关闭时卸载 React root 并中止在途请求，表单密码不持久化。动画遵循 prefers-reduced-motion。
+页面保留原生设计库，登录功能以 React 组件挂载到 `index.html` 的 `#auth-root`。点击 Sign in 时动态加载 `mount.tsx` 和组件样式；居中原生 dialog 搭配半透明玻璃遮罩与背景模糊，提供焦点限制、右上角关闭按钮、Esc 返回及关闭后焦点恢复；小屏保持四周留白，内容过长时在弹窗内滚动。关闭时卸载 React root 并停止更新表单；已经发出的认证请求继续完成，随后重新读取 /auth/me，避免界面与服务器会话不一致。表单密码不持久化。动画遵循 prefers-reduced-motion。
 
 - `src/components/ui/login-03.tsx`：由用户提供的 Hirael Login 03 改编，桌面双栏、手机单栏；保留 SVG 线条、Motion 动画与来源许可，替换示例品牌与虚构引语。
 - `src/components/ui/button.tsx`：提供的 shadcn 风格按钮、Radix Slot 和 cva 变体。
 - `src/lib/utils.ts`：clsx + tailwind-merge 的 cn 工具。
-- `src/features/auth/mount.tsx`：连接现有用户名密码 API，成功后通知设计库切换当前用户。
+- `src/features/auth/mount.tsx`：连接现有用户名密码 API，通过统一会话状态协调器请求认证并重新获取后端身份。
 - `src/features/auth/auth.css`：Tailwind v4 theme/utilities 与限定在 auth-root 的组件样式。不导入 Preflight，避免修改现有原生页面的默认样式。
 
 `Login03` 接收 `onHome`、`onAuthenticate(mode, credentials, signal)`；可选 `onGithub` 只有传入实际实现才显示 GitHub 按钮。目前未传入，不提供模拟跳转。默认登录与注册使用真实 `/api/auth/login`、`/api/auth/register`，没有添加虚假的条款/隐私链接。示例无需图片资产，视觉由提供的 SVG 绘制。
@@ -21,3 +21,5 @@
 在仓库根目录执行 `npm run typecheck` 检查前后端类型，`npm run build` 构建两端。新增 Vite 插件后，已有开发服务需要重启一次。
 
 来源：[Hirael Login 03](https://hirael.com/blocks/auth/login-03)，MIT 许可随组件保存在 `login-03.LICENSE`。
+
+注册密码确认、长度及用户名格式均由后端校验；表单使用 noValidate，只展示服务端错误。状态协调器通过版本号阻止过期恢复请求覆盖新登录或注销状态，并在窗口重新获得焦点时恢复会话。

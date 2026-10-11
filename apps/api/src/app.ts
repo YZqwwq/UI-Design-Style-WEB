@@ -3,13 +3,14 @@ import Fastify, { LogController, type FastifyError } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { buildPrompt } from './prompt.js';
 import type { CatalogRepository, Filters } from './types.js';
+import { installLibrary, type LibraryStore } from './library.js';
 
 const idSchema = {
   type: 'object', additionalProperties: false, required: ['id'],
   properties: { id: { type: 'string', pattern: '^[a-zA-Z0-9_-]{1,80}$' } },
 };
 
-export function createApp(repository: CatalogRepository, options: AuthOptions & { publicRoot?: string; logger?: boolean; publicRepository?: CatalogRepository } = {}) {
+export function createApp(repository: CatalogRepository, options: AuthOptions & { publicRoot?: string; logger?: boolean; publicRepository?: CatalogRepository; library?: LibraryStore } = {}) {
   const app = Fastify({
     logger: options.logger ?? false,
     logController: new LogController({ disableRequestLogging: true }),
@@ -21,6 +22,8 @@ export function createApp(repository: CatalogRepository, options: AuthOptions & 
     reply.header('Cache-Control', 'no-store');
   });
   app.setErrorHandler<FastifyError>((error, request, reply) => {
+    if (error.code === '23505') return reply.code(409).send({error:'CONFLICT',message:'该名称已存在。'});
+    if (error.code === '23503') return reply.code(409).send({error:'IN_USE',message:'该分类或标签仍被设计使用，请先调整相关设计。'});
     if (error.validation || (error.statusCode && error.statusCode >= 400 && error.statusCode < 500)) {
       return reply.code(error.statusCode || 400).send({ error: 'INVALID_REQUEST', message: '请求参数或格式无效。' });
     }
@@ -31,6 +34,7 @@ export function createApp(repository: CatalogRepository, options: AuthOptions & 
   app.setNotFoundHandler((_request, reply) => reply.code(404).send({ error: 'NOT_FOUND', message: '未找到请求的内容。' }));
 
   installAuth(app, options);
+  if (options.library) installLibrary(app, options.library);
 
   app.get('/api/health', async () => {
     await repository.check();

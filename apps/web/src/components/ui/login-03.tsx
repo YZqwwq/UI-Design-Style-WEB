@@ -82,7 +82,7 @@ const FloatingPaths = React.memo(({ position }: { position: number }) => {
 export type AuthMode = 'login' | 'register';
 export interface Login03Props {
   onHome: () => void;
-  onAuthenticate: (mode: AuthMode, credentials: {username:string;password:string}, signal: AbortSignal) => Promise<void>;
+  onAuthenticate: (mode: AuthMode, credentials: {username:string;password:string;confirmation?:string}, signal: AbortSignal) => Promise<void>;
   // Only render the provider button when a real integration is supplied.
   onGithub?: () => Promise<void>;
 }
@@ -101,14 +101,9 @@ export default function Login03({onHome,onAuthenticate,onGithub}: Login03Props) 
     const data = new FormData(event.currentTarget);
     const username = String(data.get('username') || '');
     const password = String(data.get('password') || '');
-    if (register && password !== data.get('confirmation')) {
-      setError('两次输入的密码不一致。');
-      formRef.current?.querySelector<HTMLInputElement>('#confirm-password')?.focus();
-      return;
-    }
     const controller = new AbortController();
     pending.current = controller; setBusy(true); setError('');
-    try { await onAuthenticate(mode,{username,password},controller.signal); }
+    try { await onAuthenticate(mode,{username,password,...(register?{confirmation:String(data.get('confirmation') || '')}:{})},controller.signal); }
     catch (cause) { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '暂时无法登录，请重试。'); }
     finally { if (!controller.signal.aborted) { pending.current=null; setBusy(false); } }
   }
@@ -137,7 +132,7 @@ export default function Login03({onHome,onAuthenticate,onGithub}: Login03Props) 
             <h1 id="auth-title">{register ? 'Make it yours.' : 'Welcome back.'}</h1>
             <p className="auth-intro">{register ? '创建账号，开始整理属于你的设计收藏。' : '登录设计图鉴，继续你的灵感收藏。'}</p>
           </div>
-          <form id="auth-form" ref={formRef} onSubmit={submit} className={cn(ENTER,'auth-fields')} style={stagger(2)} aria-busy={busy}>
+          <form id="auth-form" noValidate ref={formRef} onSubmit={submit} className={cn(ENTER,'auth-fields')} style={stagger(2)} aria-busy={busy}>
             <label htmlFor="username">用户名</label>
             <input id="username" name="username" autoComplete="username" autoFocus required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_]{3,32}" placeholder="输入用户名" aria-describedby={register ? 'username-help':undefined} disabled={busy}/>
             {register ? <small id="username-help">3–32 位字母、数字或下划线，不区分大小写。</small> : null}

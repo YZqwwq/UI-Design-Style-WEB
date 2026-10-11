@@ -7,9 +7,9 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "typecheck": "tsc --noEmit"
+    "dev": "node ../../scripts/tool.mjs vite",
+    "build": "node ../../scripts/tool.mjs vite build",
+    "typecheck": "node ../../scripts/tool.mjs tsc --noEmit"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

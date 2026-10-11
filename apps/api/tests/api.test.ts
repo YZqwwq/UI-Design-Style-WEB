@@ -11,8 +11,8 @@ import type { CatalogRepository, Filters } from '../src/types.js';
 function createApp(repository: CatalogRepository, options: Parameters<typeof buildApp>[1] = {}) {
   return buildApp(repository, { ...options, auth: {
     session: async () => ({id:'00000000-0000-4000-8000-000000000001',username:'fixture'}),
-    register: async () => undefined, verify: async () => undefined,
-    issue: async () => '', revoke: async () => {},
+    register: async () => undefined, login: async () => undefined,
+    revokeAll: async () => {}, changePassword: async () => false, revoke: async () => {},
   }});
 }
 

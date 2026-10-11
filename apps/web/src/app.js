@@ -1,4 +1,6 @@
 import { setLibraryScope, request, fetchCatalog, fetchDesigns, fetchDesign, fetchPrompt } from './api.js';
+import { createSessionState } from './session-state.js';
+import { installManagement } from './library-ui.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { category: '', tag: '', query: '' };
@@ -162,6 +164,11 @@ async function openDetail(id, fallbackText) {
       promptTimer = setTimeout(() => updatePrompt(id, purpose), 250);
     });
     $('#copy-prompt').addEventListener('click', () => copyText($('#prompt').value));
+    if (currentUser) {
+      const edit=document.createElement('button');edit.className='shell-button';edit.textContent='编辑设计';
+      edit.addEventListener('click',()=>void management.editor(id));
+      $('#detail-content .design-description').append(edit);
+    }
     if (fallbackText !== undefined) {
       $('#prompt').focus(); $('#prompt').select();
       notify('浏览器未允许自动复制。已选中提示词，请按 Ctrl+C / ⌘C 或长按复制。');
@@ -260,12 +267,15 @@ window.matchMedia('(max-width: 1000px)').addEventListener('change', () => {
 
 const authChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('atlas-auth') : null;
 let currentUser = null;
+let sessionInitialized = false;
+const sessionState = createSessionState(() => request('/auth/me'), showUser);
+const management=installManagement({request,getUser:()=>currentUser,refresh:()=>{Object.assign(state,{category:'',tag:'',query:''});$('#search').value='';return loadList();},openDetail,mutateAuth,escapeHTML});
 let authView;
 let authModule;
 let openingAuth = false;
 const loadAuthComponent = () => authModule ||= import('./features/auth/mount.tsx').catch(error => { authModule = undefined; throw error; });
 async function openAuth() {
-  if (openingAuth || currentUser || $('#auth-gate').open) return;
+  if (openingAuth || sessionState.busy || currentUser || $('#auth-gate').open) return;
   openingAuth = true;
   $('#account').setAttribute('aria-busy', 'true');
   try {
@@ -274,7 +284,7 @@ async function openAuth() {
     if ($('#detail').open) $('#detail').close();
     authView = mountAuth($('#auth-root'), {
       onHome: () => $('#auth-gate').close(),
-      onAuthenticated: user => { showUser(user); authChannel?.postMessage('changed'); },
+      authenticate: (mode,credentials) => mutateAuth(`/auth/${mode}`,credentials),
     });
     $('#auth-gate').showModal();
     $('#username')?.focus();
@@ -282,6 +292,9 @@ async function openAuth() {
   finally { openingAuth = false; $('#account').removeAttribute('aria-busy'); }
 }
 function showUser(user) {
+  if (sessionInitialized && currentUser?.id === user?.id) return;
+  sessionInitialized = true;
+  management.close();
   cancelList(); detailVersion++; detailController?.abort(); stopPrompt();
   if ($('#detail').open) $('#detail').close();
   currentUser = user;
@@ -294,27 +307,33 @@ function showUser(user) {
   $('#reset').hidden = true; $('#count').textContent = '';
   if ($('#auth-gate').open) $('#auth-gate').close();
   $('#search').disabled = false; $('#logout').hidden = !user;
+  $('#new-design').hidden=!user;$('.library-management').hidden=!user;
   $('#account').textContent = user ? user.username : 'Sign in';
-  $('#account').disabled = !!user;
+  $('#account').disabled = false;
   $('#account').title = user ? user.username : 'Sign in';
   void loadList();
 }
-$('#account').addEventListener('click', () => void openAuth());
+$('#account').addEventListener('click', () => currentUser ? management.account() : void openAuth());
 $('#account').addEventListener('pointerenter', () => { if (!currentUser) void loadAuthComponent().catch(() => {}); });
 $('#logout').addEventListener('click', async () => {
   $('#logout').disabled = true;
-  try { await request('/auth/logout',{method:'POST',body:'{}'}); showUser(null); authChannel?.postMessage('changed'); $('#account').focus(); }
+  try { await mutateAuth('/auth/logout',{}); $('#account').focus(); }
   catch(error) { notify(error.message); }
   finally { $('#logout').disabled = false; }
 });
 window.addEventListener('auth-required', () => {
   if (!currentUser) return;
+  sessionState.invalidate();
   showUser(null); notify('登录已过期，已返回公开设计。');
 });
 async function restoreUser() {
-  try { const data = await request('/auth/me'); showUser(data.user); }
-  catch { showUser(null); }
+  await sessionState.restore();
+}
+async function mutateAuth(path, body) {
+  try { await sessionState.mutate(() => request(path,{method:'POST',body:JSON.stringify(body)})); }
+  finally { authChannel?.postMessage('changed'); }
 }
 void restoreUser();
 if (authChannel) authChannel.onmessage = () => { showUser(null); void restoreUser(); };
+window.addEventListener('focus', () => { if (!sessionState.busy) void restoreUser(); });
 $('#auth-gate').addEventListener('close', () => { authView?.destroy(); authView = undefined; });

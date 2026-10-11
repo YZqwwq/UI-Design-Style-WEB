@@ -2,7 +2,7 @@ export async function request(path, { signal, ...options } = {}) {
   const response = await fetch(`/api${path}`, {
     ...options,
     signal,
-    headers: { 'Content-Type': 'application/json', 'X-Atlas-Request': '1', ...options.headers },
+    headers: { ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }), 'X-Atlas-Request': '1', ...options.headers },
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));

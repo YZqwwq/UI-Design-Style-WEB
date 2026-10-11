@@ -7,6 +7,8 @@ node_modules/
 # Local environment files may contain database credentials.
 .env
 .env.*
+.ENV
+.ENV.*
 !.env.example
 
 # Local rule mounting state (registry and sources remain tracked).

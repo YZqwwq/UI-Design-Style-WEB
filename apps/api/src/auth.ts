@@ -47,20 +47,21 @@ export function installAuth(app: FastifyInstance, options: AuthOptions) {
     },
   };
   for (const action of ['register','login'] as const) {
-    app.post<{ Body: { username:string; password:string } }>(`/api/auth/${action}`, { schema: { body:credentials } }, async (request,reply) => {
+    const body = action === 'register' ? { ...credentials, required:[...credentials.required,'confirmation'], properties:{...credentials.properties,confirmation:{type:'string',maxLength:128}} } : credentials;
+    app.post<{ Body: { username:string; password:string; confirmation?:string } }>(`/api/auth/${action}`, { schema: { body } }, async (request,reply) => {
       if (!options.auth) return reply.code(503).send({error:'SERVICE_UNAVAILABLE',message:'账号服务暂时不可用。'});
       const username = request.body.username.toLowerCase();
       const key = createHash('sha256').update(username).digest('hex');
-      if (!allowed(`ip:${request.ip}`,30) || !allowed(`user:${action}:${key}`,10) || hashing >= 2) {
+      if (!allowed(`ip:${request.ip}`,30) || !allowed(`user:${action}:${key}`,10)) {
         return reply.header('Retry-After','600').code(429).send({ error:'TOO_MANY_ATTEMPTS',message:'尝试过于频繁，请稍后再试。' });
       }
+      if (hashing >= 2) return reply.header('Retry-After','2').code(503).send({error:'BUSY',message:'账号服务繁忙，请稍后重试。'});
       hashing++;
       try {
-        const user = action === 'register' ? await options.auth.register(username,request.body.password) : await options.auth.verify(username,request.body.password);
-        if (!user) return reply.code(action === 'register' ? 409 : 401).send({error:action === 'register' ? 'USERNAME_TAKEN':'INVALID_CREDENTIALS',message:action === 'register' ? '这个用户名已被使用。':'用户名或密码不正确。'});
-        const token = await options.auth.issue(user.id);
-        const old = tokenFrom(request.headers.cookie);
-        if (old) await options.auth.revoke(old);
+        if (action === 'register' && request.body.password !== request.body.confirmation) return reply.code(400).send({error:'PASSWORD_MISMATCH',message:'两次输入的密码不一致。'});
+        const result = await options.auth[action](username,request.body.password,tokenFrom(request.headers.cookie));
+        if (!result) return reply.code(action === 'register' ? 409 : 401).send({error:action === 'register' ? 'USERNAME_TAKEN':'INVALID_CREDENTIALS',message:action === 'register' ? '这个用户名已被使用。':'用户名或密码不正确。'});
+        const { user, token } = result;
         return reply.header('Set-Cookie',cookie(token)).code(action === 'register' ? 201 : 200).send({ user });
       } finally { hashing--; }
     });
@@ -69,5 +70,23 @@ export function installAuth(app: FastifyInstance, options: AuthOptions) {
     const token = tokenFrom(request.headers.cookie);
     if (token && options.auth) await options.auth.revoke(token);
     return reply.header('Set-Cookie',cookie('',0)).send({ ok:true });
+  });
+  app.post('/api/auth/logout-all', { schema: { body: { type:'object', additionalProperties:false, properties:{} } } }, async (request,reply) => {
+    await options.auth!.revokeAll(request.user!.id);
+    return reply.header('Set-Cookie',cookie('',0)).send({ok:true});
+  });
+  app.post<{Body:{currentPassword:string;password:string;confirmation:string}}>('/api/auth/password', {
+    schema: { body: {type:'object',additionalProperties:false,required:['currentPassword','password','confirmation'],properties:{
+      currentPassword:{type:'string',minLength:1,maxLength:128}, password:{type:'string',minLength:10,maxLength:128}, confirmation:{type:'string',maxLength:128},
+    }} },
+  }, async (request,reply) => {
+    if (!allowed(`password:${request.user!.id}`,10) || !allowed(`ip:${request.ip}`,30)) return reply.header('Retry-After','600').code(429).send({error:'TOO_MANY_ATTEMPTS',message:'尝试过于频繁，请稍后再试。'});
+    if (request.body.password !== request.body.confirmation) return reply.code(400).send({error:'PASSWORD_MISMATCH',message:'两次输入的密码不一致。'});
+    if (hashing >= 2) return reply.header('Retry-After','2').code(503).send({error:'BUSY',message:'账号服务繁忙，请稍后重试。'});
+    hashing++;
+    try {
+      if (!await options.auth!.changePassword(request.user!.id,request.body.currentPassword,request.body.password)) return reply.code(400).send({error:'INVALID_CREDENTIALS',message:'当前密码不正确。'});
+      return reply.header('Set-Cookie',cookie('',0)).send({ok:true});
+    } finally { hashing--; }
   });
 }
