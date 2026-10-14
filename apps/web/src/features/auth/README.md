@@ -5,10 +5,10 @@
 - `src/components/ui/login-03.tsx`：由用户提供的 Hirael Login 03 改编，桌面双栏、手机单栏；保留 SVG 线条、Motion 动画与来源许可，替换示例品牌与虚构引语。
 - `src/components/ui/button.tsx`：提供的 shadcn 风格按钮、Radix Slot 和 cva 变体。
 - `src/lib/utils.ts`：clsx + tailwind-merge 的 cn 工具。
-- `src/features/auth/mount.tsx`：连接现有用户名密码 API，通过统一会话状态协调器请求认证并重新获取后端身份。
+- `src/features/auth/mount.tsx`：连接邮箱密码认证 API（旧账号兼容用户名），通过统一会话状态协调器请求认证并重新获取后端身份。
 - `src/features/auth/auth.css`：Tailwind v4 theme/utilities 与限定在 auth-root 的组件样式。不导入 Preflight，避免修改现有原生页面的默认样式。
 
-`Login03` 接收 `onHome`、`onAuthenticate(mode, credentials, signal)`；可选 `onGithub` 只有传入实际实现才显示 GitHub 按钮。目前未传入，不提供模拟跳转。默认登录与注册使用真实 `/api/auth/login`、`/api/auth/register`，没有添加虚假的条款/隐私链接。示例无需图片资产，视觉由提供的 SVG 绘制。
+`Login03` 接收 `onHome`、`onAuthenticate(mode, credentials, signal)`、`onSendCode(email, signal)`；可选 `onGithub` 只有传入实际实现才显示 GitHub 按钮。目前未传入，不提供模拟跳转。默认登录与注册使用真实 `/api/auth/login`、`/api/auth/register`，没有添加虚假的条款/隐私链接。示例无需图片资产，视觉由提供的 SVG 绘制。
 
 ## 项目配置
 
@@ -22,4 +22,8 @@
 
 来源：[Hirael Login 03](https://hirael.com/blocks/auth/login-03)，MIT 许可随组件保存在 `login-03.LICENSE`。
 
-注册密码确认、长度及用户名格式均由后端校验；表单使用 noValidate，只展示服务端错误。状态协调器通过版本号阻止过期恢复请求覆盖新登录或注销状态，并在窗口重新获得焦点时恢复会话。
+注册密码确认、长度及显示名称长度均由后端校验；表单使用 noValidate，只展示服务端错误。状态协调器通过版本号阻止过期恢复请求覆盖新登录或注销状态，并在窗口重新获得焦点时恢复会话。
+
+注册表单增加邮箱与 6 位验证码，通过 `/api/auth/register/email-code` 请求发送，显示重发倒计时和发送反馈。提交注册携带 `email`、`code`；验证码有效性由后端决定，关闭组件会中止未完成的发信请求但无法撤销服务商已接受的发送。登录表单使用邮箱和密码；没有绑定邮箱的旧账号仍可使用原用户名。
+
+邮箱身份调整：迁移 `004_email_identity.sql` 移除显示名称唯一约束，保留无邮箱旧账号的用户名唯一约束。重复邮箱返回 `EMAIL_TAKEN`。内部 API 登录标识仍通过 `username` 字段传递邮箱，以兼容现有调用结构；数据隔离始终使用用户 ID。

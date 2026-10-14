@@ -5,6 +5,14 @@ import type { Pool } from 'pg';
 import { designs } from './seed/designs.js';
 import { migrationsDirectory } from '../src/paths.js';
 
+// Git may check SQL out as CRLF on Windows. Accept historical line-ending hashes,
+// while retaining the content-change guard and storing normalized hashes for new migrations.
+export function migrationChecksums(sql: string) {
+  const lf=sql.replace(/\r\n/g,'\n');
+  const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
+  return {canonical:hash(lf),accepted:new Set([hash(sql),hash(lf),hash(lf.replace(/\n/g,'\r\n'))])};
+}
+
 export async function migrate(pool: Pool, directory = migrationsDirectory) {
   const client = await pool.connect();
   try {
@@ -17,10 +25,10 @@ export async function migrate(pool: Pool, directory = migrationsDirectory) {
     await client.query('CREATE TABLE IF NOT EXISTS design_atlas.schema_migrations (name text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())');
     for (const name of (await readdir(directory)).filter(name => /^\d+_.*\.sql$/.test(name)).sort()) {
       const sql = await readFile(path.join(directory, name), 'utf8');
-      const checksum = createHash('sha256').update(sql).digest('hex');
+      const {canonical:checksum,accepted} = migrationChecksums(sql);
       const previous = await client.query('SELECT checksum FROM design_atlas.schema_migrations WHERE name = $1', [name]);
       if (previous.rowCount) {
-        if (previous.rows[0].checksum !== checksum) throw Object.assign(new Error(), { code: 'MIGRATION_CHANGED' });
+        if (!accepted.has(previous.rows[0].checksum)) throw Object.assign(new Error(), { code: 'MIGRATION_CHANGED' });
         continue;
       }
       await client.query(sql);

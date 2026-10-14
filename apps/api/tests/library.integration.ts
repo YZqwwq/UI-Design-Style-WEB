@@ -1,3 +1,4 @@
+import {registrationVerification,cleanupCodes,testEmailSecret} from './helpers/email.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -11,7 +12,7 @@ import { createApp } from '../src/app.js';
 
 test('real database: owner-scoped writes, password changes, logout-all and atomic registration',async()=>{
  const pool=createPool((await loadConfig()).db);
- const auth=createAuthStore(pool),repo=createRepository(pool);
+ const auth=createAuthStore(pool,testEmailSecret),repo=createRepository(pool);
  const app=createApp(repo,{auth,library:createLibraryStore(pool),publicRepository:createTemplateRepository(pool)});
  const suffix=randomBytes(6).toString('hex');
  const names=[`write_a_${suffix}`,`write_b_${suffix}`,`fail_${suffix}`];
@@ -23,7 +24,7 @@ test('real database: owner-scoped writes, password changes, logout-all and atomi
   const templates=(await pool.query('SELECT * FROM design_atlas.designs ORDER BY id')).rows;
   const accounts=[];
   for(const username of names.slice(0,2)){
-   const response=await send('','POST','/api/auth/register',{username,password,confirmation:password});
+   const response=await send('','POST','/api/auth/register',{username,password,confirmation:password,...await registrationVerification(pool,username)});
    assert.equal(response.statusCode,201,response.body);accounts.push({user:response.json().user,cookie:cookieOf(response)});
   }
   const [a,b]=accounts;
@@ -57,7 +58,7 @@ test('real database: owner-scoped writes, password changes, logout-all and atomi
   for(const kind of ['categories','tags']) assert.equal((await send(a.cookie,'DELETE',`/api/${kind}/${termIds[kind]}`)).statusCode,200);
   assert.deepEqual((await pool.query('SELECT * FROM design_atlas.designs ORDER BY id')).rows,templates);
 
-  const login=()=>send('','POST','/api/auth/login',{username:names[0],password});
+  const login=()=>send('','POST','/api/auth/login',{username:names[0]+'@example.com',password});
   const second=await login();assert.equal(second.statusCode,200);
   const newPassword=password+'-new';
   assert.equal((await send(a.cookie,'POST','/api/auth/password',{currentPassword:'wrong',password:newPassword,confirmation:newPassword})).statusCode,400);
@@ -65,7 +66,7 @@ test('real database: owner-scoped writes, password changes, logout-all and atomi
   assert.equal((await send(a.cookie,'POST','/api/auth/password',{currentPassword:password,password:newPassword,confirmation:newPassword})).statusCode,200);
   for(const cookie of [a.cookie,cookieOf(second)]) assert.equal((await app.inject({url:'/api/designs',headers:{cookie}})).statusCode,401);
   assert.equal((await login()).statusCode,401);
-  const newLogin=()=>send('','POST','/api/auth/login',{username:names[0],password:newPassword});
+  const newLogin=()=>send('','POST','/api/auth/login',{username:names[0]+'@example.com',password:newPassword});
   const one=await newLogin(),two=await newLogin();assert.equal(one.statusCode,200);assert.equal(two.statusCode,200);
   assert.equal((await send(cookieOf(one),'POST','/api/auth/logout-all',{})).statusCode,200);
   assert.equal((await app.inject({url:'/api/designs',headers:{cookie:cookieOf(two)}})).statusCode,401);
@@ -84,12 +85,13 @@ test('real database: owner-scoped writes, password changes, logout-all and atomi
     const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;
    }});
   }} as unknown as Pool;
-  await assert.rejects(createAuthStore(failingPool).register(names[2],password),/injected/);
+  const verification=await registrationVerification(pool,names[2]);
+  await assert.rejects(createAuthStore(failingPool,testEmailSecret).register(names[2],password,undefined,verification),/injected/);
   assert.equal((await pool.query('SELECT id FROM design_atlas.users WHERE username=$1',[names[2]])).rowCount,0);
-  assert.ok(await auth.register(names[2],password));
+  assert.ok(await auth.register(names[2],password,undefined,verification));
  } finally {
   await app.close();
-  try {await pool.query('DELETE FROM design_atlas.users WHERE username=ANY($1::text[])',[names]);}
+  try {await cleanupCodes(pool,names);await pool.query('DELETE FROM design_atlas.users WHERE username=ANY($1::text[])',[names]);}
   finally {await pool.end();}
  }
 });

@@ -9,6 +9,7 @@ export async function request(path, { signal, ...options } = {}) {
     if (response.status === 401 && !path.startsWith('/auth/')) window.dispatchEvent(new Event('auth-required'));
     const error = new Error(data.message || (response.status === 404 ? '该设计不存在或已被移除。' : '暂时无法加载，请重试。'));
     error.status = response.status;
+    error.retryAfter = Number(response.headers.get('Retry-After') || data.retryAfter || 0);
     throw error;
   }
   return response.json();

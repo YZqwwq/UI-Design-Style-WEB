@@ -1,9 +1,10 @@
+import { type EmailRegistration, normalizeEmail } from './email-registration.js';
 import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { sessionSeconds, type AuthStore, type User } from './auth-store.js';
 
 declare module 'fastify' { interface FastifyRequest { user: User | null } }
-export interface AuthOptions { auth?: AuthStore; origins?: string[]; secureCookie?: boolean }
+export interface AuthOptions { auth?: AuthStore; emailRegistration?: EmailRegistration; origins?: string[]; secureCookie?: boolean }
 function tokenFrom(cookie?: string) {
   const values = (cookie || '').split(';').map(part => part.trim()).filter(part => part.startsWith('atlas_session='));
   return values.length === 1 ? values[0].slice('atlas_session='.length) : '';
@@ -33,24 +34,30 @@ export function installAuth(app: FastifyInstance, options: AuthOptions) {
         return reply.code(403).send({ error:'FORBIDDEN',message:'请求来源无效，请从网站页面操作。' });
       }
     }
-    if (route === '/api/auth/register' || route === '/api/auth/login' || route === '/api/health' || route.startsWith('/api/public/')) return;
+    if (route === '/api/auth/register/email-code' || route === '/api/auth/register' || route === '/api/auth/login' || route === '/api/health' || route.startsWith('/api/public/')) return;
     request.user = await options.auth?.session(tokenFrom(request.headers.cookie)) || null;
     if (route === '/api/auth/me' || route === '/api/auth/logout') return;
     if (!request.user) return reply.code(401).send({ error:'UNAUTHORIZED',message:'请先登录。' });
   });
   app.get('/api/auth/me', async request => ({ user: request.user }));
+  const emailSchema = {type:'string',minLength:3,maxLength:254,pattern:'^[^\\s@,;<>]+@[^\\s@,;<>]+\\.[^\\s@,;<>]+$'};
+  app.post<{Body:{email:string}}>('/api/auth/register/email-code', {schema:{body:{type:'object',additionalProperties:false,required:['email'],properties:{email:emailSchema}}}}, async(request,reply)=>{
+    if (!options.emailRegistration) return reply.code(503).send({error:'MAIL_UNAVAILABLE',message:'注册邮件服务尚未配置，请稍后再试。'});
+    if (!allowed(`mail-ip:${request.ip}`,10) || !allowed('mail-global',100)) return reply.header('Retry-After','600').code(429).send({error:'TOO_MANY_ATTEMPTS',message:'发送过于频繁，请稍后再试。'});
+    return options.emailRegistration.requestCode(normalizeEmail(request.body.email));
+  });
   const credentials = {
     type:'object', additionalProperties:false, required:['username','password'],
     properties: {
-      username: { type:'string',pattern:'^[a-zA-Z0-9_]{3,32}$' },
+      username: { type:'string',minLength:1,maxLength:254 },
       password: { type:'string',minLength:10,maxLength:128 },
     },
   };
   for (const action of ['register','login'] as const) {
-    const body = action === 'register' ? { ...credentials, required:[...credentials.required,'confirmation'], properties:{...credentials.properties,confirmation:{type:'string',maxLength:128}} } : credentials;
-    app.post<{ Body: { username:string; password:string; confirmation?:string } }>(`/api/auth/${action}`, { schema: { body } }, async (request,reply) => {
+    const body = action === 'register' ? { ...credentials, required:[...credentials.required,'confirmation','email','code'], properties:{...credentials.properties,username:{type:'string',minLength:1,maxLength:32,pattern:'\\S'},confirmation:{type:'string',maxLength:128},email:emailSchema,code:{type:'string',pattern:'^[0-9]{6}$'}} } : credentials;
+    app.post<{ Body: { username:string; password:string; confirmation?:string; email?:string; code?:string } }>(`/api/auth/${action}`, { schema: { body } }, async (request,reply) => {
       if (!options.auth) return reply.code(503).send({error:'SERVICE_UNAVAILABLE',message:'账号服务暂时不可用。'});
-      const username = request.body.username.toLowerCase();
+      const username = action === 'register' ? request.body.username.trim() : request.body.username.trim().toLowerCase();
       const key = createHash('sha256').update(username).digest('hex');
       if (!allowed(`ip:${request.ip}`,30) || !allowed(`user:${action}:${key}`,10)) {
         return reply.header('Retry-After','600').code(429).send({ error:'TOO_MANY_ATTEMPTS',message:'尝试过于频繁，请稍后再试。' });
@@ -59,8 +66,10 @@ export function installAuth(app: FastifyInstance, options: AuthOptions) {
       hashing++;
       try {
         if (action === 'register' && request.body.password !== request.body.confirmation) return reply.code(400).send({error:'PASSWORD_MISMATCH',message:'两次输入的密码不一致。'});
-        const result = await options.auth[action](username,request.body.password,tokenFrom(request.headers.cookie));
-        if (!result) return reply.code(action === 'register' ? 409 : 401).send({error:action === 'register' ? 'USERNAME_TAKEN':'INVALID_CREDENTIALS',message:action === 'register' ? '这个用户名已被使用。':'用户名或密码不正确。'});
+        const result = action === 'register'
+          ? await options.auth.register(username,request.body.password,tokenFrom(request.headers.cookie),{email:normalizeEmail(request.body.email!),code:request.body.code!})
+          : await options.auth.login(username,request.body.password,tokenFrom(request.headers.cookie));
+        if (!result) return reply.code(action === 'register' ? 409 : 401).send({error:action === 'register' ? 'EMAIL_TAKEN':'INVALID_CREDENTIALS',message:action === 'register' ? '该邮箱已被注册，请登录或使用其他邮箱。':'邮箱或密码不正确。'});
         const { user, token } = result;
         return reply.header('Set-Cookie',cookie(token)).code(action === 'register' ? 201 : 200).send({ user });
       } finally { hashing--; }

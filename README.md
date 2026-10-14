@@ -87,15 +87,15 @@ WEB_PORT=5173 API_PORT=5174 npm run dev
 
 迁移入口为 `apps/api/db/migrate.ts`，SQL 在 `apps/api/db/migrations/`，初始设计在 `apps/api/db/seed/designs.ts`。
 
-迁移使用事务和事务级锁，记录已执行文件及校验和。初始数据仅导入一次；重复执行不会覆盖已有模板，也不会重新补回用户后来删除的私有设计。发现同名 schema 不含本项目迁移记录时会停止，避免接管无关表。
+迁移使用事务和事务级锁，记录已执行文件及校验和；兼容历史 Windows CRLF / Unix LF 换行差异，仍拒绝 SQL 内容变更。初始数据仅导入一次；重复执行不会覆盖已有模板，也不会重新补回用户后来删除的私有设计。发现同名 schema 不含本项目迁移记录时会停止，避免接管无关表。
 
-已执行的 SQL 不应原地修改，应新增编号迁移。初始导入后修改种子文件不会自动更新线上记录。当前没有设计或分类管理写入 API，后续通过明确的数据迁移或新增管理功能维护。
+已执行的 SQL 不应原地修改，应新增编号迁移。初始导入后修改种子文件不会自动更新线上记录。个人设计和分类通过现有管理 API 维护，公共初始化模板通过明确的数据迁移维护。
 
 ## 账号与私有设计库
 
 未登录时正常浏览公开初始化模板，支持搜索、筛选、详情与提示词；点击右上角 Sign in 才打开独立的居中登录/注册弹窗（半透明玻璃遮罩与背景模糊），宽屏双栏、小屏单栏，可返回设计库。登录后切换到个人库，退出或会话过期后回到公开模板。
 
-直接开放用户名密码注册，无需邀请码。用户名为 3–32 位英文字母、数字或下划线，统一转小写；密码为 10–128 字符。注册成功自动登录，并在事务中复制初始化模板到该账号的私有库。原始 `categories`、`tags`、`designs` 保留为模板；`user_categories`、`user_tags`、`user_designs` 保存独立副本，不在登录时重复复制。
+开放用户名密码注册，无需邀请码；新账号必须完成邮箱验证码验证，一个邮箱只能绑定一个账号，已有无邮箱账号仍可登录。显示名称为 1–32 个字符，保留大小写、允许重名；邮箱是唯一注册身份和登录账号；密码为 10–128 字符。注册成功自动登录，并在事务中复制初始化模板到该账号的私有库。原始 `categories`、`tags`、`designs` 保留为模板；`user_categories`、`user_tags`、`user_designs` 保存独立副本，不在登录时重复复制。
 
 密码使用 Node.js 异步 scrypt（N=131072、r=8、p=1、随机 16 字节盐）；数据库只保存哈希。会话有效期 7 天，浏览器使用 HttpOnly、SameSite=Lax Cookie，数据库保存随机会话令牌的 SHA-256 摘要。退出会撤销会话；到期记录在创建新会话时清理。注册和登录有单进程尝试频率限制与密码计算并发限制，尚未支持分布式限流。
 
@@ -114,7 +114,8 @@ WEB_PORT=5173 API_PORT=5174 npm run dev
 | 方法与路径 | 行为 |
 | --- | --- |
 | `GET /api/health` | 检查数据库与设计表可读性，正常返回 200，异常返回 503 |
-| `POST /api/auth/register` | `{ username, password, confirmation }`；后端校验确认密码，在同一事务内创建账号、复制模板并建立会话 |
+| `POST /api/auth/register/email-code` | `{ email }`；发送注册验证码，成功返回重发等待时间与有效期 |
+| `POST /api/auth/register` | `{ username, password, confirmation, email, code }`；后端校验确认密码与邮箱验证码，在同一事务内消费验证码、创建账号、复制模板并建立会话 |
 | `POST /api/auth/login` | `{ username, password }`；验证后建立会话 |
 | `POST /api/auth/logout` | 撤销当前会话并清除 Cookie |
 | `GET /api/auth/me` | 返回当前 `{ user }`，未登录时为 null |
@@ -186,3 +187,18 @@ npm run dev
 ```
 
 本地运行 npm test、npm run typecheck、npm run build；配置专用测试数据库并迁移后运行 npm run test:db 与 npm run test:auth:db。后者创建唯一测试账号并清理，不应用生产数据库承担测试。Windows 无文件符号链接权限时仅跳过独立链接测试，其他规则断言照常运行；Linux CI 完整执行该项及数据库集成测试。
+
+
+## 注册邮箱验证
+
+配置根目录 `.env` 的 `MAIL_PROVIDER=aliyun`、`ALIBABA_CLOUD_ACCESS_KEY_ID`、`ALIBABA_CLOUD_ACCESS_KEY_SECRET`、`ALIYUN_DM_REGION_ID`、`MAIL_FROM_ADDRESS`、`MAIL_FROM_NAME`、`MAIL_REPLY_TO_ENABLED`，字段说明见 `.env.example`。服务端通过 HTTPS 调用 DirectMail SingleSendMail，不使用 SMTP。重启后端后生效；缺少邮件凭据不会阻止已有用户登录，但禁止发送验证码和新用户注册。邮件配置目前在开发/正式入口共用，开发时点击发送也会实际发信。
+
+先对目标数据库执行迁移：开发为 `npm run db:migrate`，部署正式环境前显式执行 `npm run db:migrate:prod`。新增 `003_email_registration.sql` 为账号增加可空邮箱和验证时间，并创建注册验证码表；不重建已有账号和设计库。邮箱登录已实现；旧账号补绑邮箱、换绑和密码找回尚未实现。
+
+验证码为随机 6 位数字，10 分钟有效、60 秒后可重发，同一邮箱每 10 分钟最多发送 5 次，每条验证码最多校验 5 次。重发替换旧验证码，成功注册后立即消费。数据库只保存带密钥的 HMAC 摘要，绑定邮箱、挑战 ID 和注册用途；使用邮件 AccessKey Secret 作为服务端密钥，轮换后需要重新获取验证码。邮箱去除首尾空格并统一小写，不删除点号或 `+` 后缀。
+
+邮箱重发限制由数据库原子更新实现；另有单进程每 IP 10 次 / 10 分钟、全局 100 次 / 10 分钟的发信上限。邮件超时和失败不自动重试，无法确认发送成功的验证码不允许注册。发送状态与账号注册均由后端判定，浏览器倒计时只用于交互提示。发送成功请求会清理过期超过一天的未使用验证码记录。
+
+`npm run test:auth:db` 使用模拟邮件发送器和真实测试库验证完整流程，不向测试地址实际发信；随机测试账号与验证记录在结束时清理。
+
+邮箱身份调整：迁移 `004_email_identity.sql` 移除显示名称唯一约束，保留无邮箱旧账号的用户名唯一约束。重复邮箱返回 `EMAIL_TAKEN`。内部 API 登录标识仍通过 `username` 字段传递邮箱，以兼容现有调用结构；数据隔离始终使用用户 ID。

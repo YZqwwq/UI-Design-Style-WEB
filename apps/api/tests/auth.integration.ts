@@ -1,3 +1,4 @@
+import {registrationVerification,cleanupCodes,testEmailSecret} from './helpers/email.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, createHash } from 'node:crypto';
@@ -10,7 +11,7 @@ import { createApp } from '../src/app.js';
 // Explicit opt-in: creates only unique test users, removes them and all their copies in finally.
 test('PostgreSQL registration copies templates, isolates users and persists/revokes sessions',async()=>{
  const pool=createPool((await loadConfig()).db);
- const auth=createAuthStore(pool),repo=createRepository(pool);
+ const auth=createAuthStore(pool,testEmailSecret),repo=createRepository(pool);
  const app=createApp(repo,{auth});
  const suffix=randomBytes(8).toString('hex');
  const names=[`test_a_${suffix}`,`test_b_${suffix}`];
@@ -20,7 +21,7 @@ test('PostgreSQL registration copies templates, isolates users and persists/revo
   const templates=(await pool.query('SELECT id,content FROM design_atlas.designs ORDER BY position,id')).rows;
   const accounts=[];
   for(const username of names){
-   const r=await app.inject({method:'POST',url:'/api/auth/register',headers,payload:{username,password,confirmation:password}});
+   const r=await app.inject({method:'POST',url:'/api/auth/register',headers,payload:{username,password,confirmation:password,...await registrationVerification(pool,username)}});
    assert.equal(r.statusCode,201);
    accounts.push({user:r.json().user,cookie:String(r.headers['set-cookie']).split(';')[0]});
   }
@@ -48,7 +49,7 @@ test('PostgreSQL registration copies templates, isolates users and persists/revo
   assert.equal((await createAuthStore(pool).session(token))?.id,a.user.id);
   await pool.query("UPDATE design_atlas.sessions SET expires_at=now()-interval '1 second' WHERE user_id=$1",[a.user.id]);
   assert.equal((await app.inject({url:'/api/designs',headers:{cookie:a.cookie}})).statusCode,401);
-  const login=await app.inject({method:'POST',url:'/api/auth/login',headers,payload:{username:names[0].toUpperCase(),password}});assert.equal(login.statusCode,200);
+  const login=await app.inject({method:'POST',url:'/api/auth/login',headers,payload:{username:(names[0]+'@example.com').toUpperCase(),password}});assert.equal(login.statusCode,200);
   assert.equal((await repo.list({},a.user.id)).total,templates.length);
   assert.equal((await repo.get(listA.items[0].id,a.user.id))?.name,'A 独立修改');
   const cookie=String(login.headers['set-cookie']).split(';')[0];
@@ -56,7 +57,7 @@ test('PostgreSQL registration copies templates, isolates users and persists/revo
   assert.equal((await app.inject({url:'/api/designs',headers:{cookie}})).statusCode,401);
  } finally {
   await app.close();
-  try {await pool.query('DELETE FROM design_atlas.users WHERE username=ANY($1::text[])',[names]);}
+  try {await cleanupCodes(pool,names);await pool.query('DELETE FROM design_atlas.users WHERE username=ANY($1::text[])',[names]);}
   finally {await pool.end();}
  }
 });

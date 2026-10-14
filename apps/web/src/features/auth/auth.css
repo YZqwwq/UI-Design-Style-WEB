@@ -60,3 +60,11 @@ body:has(#auth-gate[open]){overflow:hidden}
 @media(max-width:1023px){#auth-gate.auth-dialog{width:min(552px,calc(100vw - 32px));max-height:calc(100dvh - 32px)}#auth-root .auth-main{min-height:0;padding:52px 32px 32px}#auth-root .auth-mobile-brand{margin-bottom:24px}}
 @media(max-width:380px){#auth-root .auth-main{padding-inline:22px}#auth-root .auth-panel h1{font-size:38px}}
 @media(prefers-reduced-motion:reduce){#auth-root .auth-enter,#auth-root .animate-spin{animation:none!important}}
+
+/* Keep the code action beside the input without narrowing the form on small screens. */
+#auth-root .auth-code-row{display:flex;gap:10px;align-items:start}
+#auth-root .auth-code-row input{flex:1;min-width:0}
+#auth-root .auth-code-send{flex:none;height:48px;padding:0 12px;border:1px solid #ffffffb3;border-radius:12px;background:#ffffff70;font-size:13px;color:var(--text);white-space:nowrap}
+#auth-root .auth-code-send:disabled{opacity:.55;cursor:default}
+#auth-root .auth-code-notice{font-size:12px;line-height:1.6;margin:-10px 0 20px;color:#555}
+#auth-root .auth-code-notice:empty{display:none}

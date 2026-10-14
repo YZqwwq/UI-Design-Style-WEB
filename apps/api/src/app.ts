@@ -1,3 +1,4 @@
+import { EmailVerificationError } from './email-registration.js';
 import { installAuth, type AuthOptions } from './auth.js';
 import Fastify, { LogController, type FastifyError } from 'fastify';
 import fastifyStatic from '@fastify/static';
@@ -22,8 +23,26 @@ export function createApp(repository: CatalogRepository, options: AuthOptions & 
     reply.header('Cache-Control', 'no-store');
   });
   app.setErrorHandler<FastifyError>((error, request, reply) => {
+    if (error instanceof EmailVerificationError) {
+      if (error.retryAfter) reply.header('Retry-After',String(error.retryAfter));
+      return reply.code(error.statusCode).send({error:error.errorCode,message:error.message,retryAfter:error.retryAfter});
+    }
     if (error.code === '23505') return reply.code(409).send({error:'CONFLICT',message:'该名称已存在。'});
     if (error.code === '23503') return reply.code(409).send({error:'IN_USE',message:'该分类或标签仍被设计使用，请先调整相关设计。'});
+    if (error.validationContext === 'body' && ['/api/auth/register', '/api/auth/login', '/api/auth/register/email-code'].includes(request.routeOptions.url || '')) {
+      const issue = error.validation?.[0];
+      const field = issue?.keyword === 'required' ? issue.params.missingProperty : issue?.instancePath.replace(/^\//, '');
+      const messages: Record<string, string> = {
+        username: request.routeOptions.url === '/api/auth/register' ? '请填写显示名称（1–32 个字符）。' : '请输入邮箱；未绑定邮箱的旧账号可使用用户名。',
+        password: '密码需要 10–128 个字符。',
+        confirmation: '请填写确认密码，最多 128 个字符，并与密码保持一致。',
+        email: '请填写有效的邮箱地址，最多 254 个字符。',
+        code: '请输入邮件中的 6 位数字验证码。',
+      };
+      if (typeof field === 'string' && Object.hasOwn(messages, field)) {
+        return reply.code(400).send({ error: 'INVALID_REQUEST', field, message: messages[field] });
+      }
+    }
     if (error.validation || (error.statusCode && error.statusCode >= 400 && error.statusCode < 500)) {
       return reply.code(error.statusCode || 400).send({ error: 'INVALID_REQUEST', message: '请求参数或格式无效。' });
     }

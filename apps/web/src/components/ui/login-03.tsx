@@ -82,34 +82,61 @@ const FloatingPaths = React.memo(({ position }: { position: number }) => {
 export type AuthMode = 'login' | 'register';
 export interface Login03Props {
   onHome: () => void;
-  onAuthenticate: (mode: AuthMode, credentials: {username:string;password:string;confirmation?:string}, signal: AbortSignal) => Promise<void>;
+  onAuthenticate: (mode: AuthMode, credentials: {username:string;password:string;confirmation?:string;email?:string;code?:string}, signal: AbortSignal) => Promise<void>;
+  onSendCode: (email:string, signal:AbortSignal) => Promise<{retryAfter:number}>;
   // Only render the provider button when a real integration is supplied.
   onGithub?: () => Promise<void>;
 }
 
-export default function Login03({onHome,onAuthenticate,onGithub}: Login03Props) {
+export default function Login03({onHome,onAuthenticate,onSendCode,onGithub}: Login03Props) {
   const [mode,setMode] = React.useState<AuthMode>('login');
   const [busy,setBusy] = React.useState(false);
   const [error,setError] = React.useState('');
+  const [sending,setSending] = React.useState(false);
+  const [cooldown,setCooldown] = React.useState(0);
+  const [notice,setNotice] = React.useState('');
+  const codeRequest = React.useRef<AbortController | null>(null);
+  React.useEffect(() => () => codeRequest.current?.abort(), []);
+  React.useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => setCooldown(value=>Math.max(0,value-1)),1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
+  async function sendCode() {
+    if (codeRequest.current || pending.current || cooldown > 0) return;
+    const email = String(new FormData(formRef.current!).get('email') || '').trim();
+    const controller = new AbortController(); codeRequest.current=controller;
+    setSending(true);setError('');setNotice('');
+    try {
+      const result = await onSendCode(email,controller.signal);
+      if (!controller.signal.aborted) {setCooldown(result.retryAfter);setNotice('验证码已发送，10 分钟内有效，请查看邮箱。');}
+    } catch(cause) {
+      if (!controller.signal.aborted) {
+        setError(cause instanceof Error ? cause.message : '验证码发送失败，请稍后重试。');
+        const wait = Number((cause as {retryAfter?:number})?.retryAfter);
+        if (Number.isFinite(wait) && wait>0) setCooldown(Math.min(wait,600));
+      }
+    } finally {if (!controller.signal.aborted) {codeRequest.current=null;setSending(false);}}
+  }
   const pending = React.useRef<AbortController | null>(null);
   const formRef = React.useRef<HTMLFormElement>(null);
   const register = mode === 'register';
   React.useEffect(() => () => pending.current?.abort(), []);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending.current) return;
+    if (pending.current || codeRequest.current) return;
     const data = new FormData(event.currentTarget);
     const username = String(data.get('username') || '');
     const password = String(data.get('password') || '');
     const controller = new AbortController();
     pending.current = controller; setBusy(true); setError('');
-    try { await onAuthenticate(mode,{username,password,...(register?{confirmation:String(data.get('confirmation') || '')}:{})},controller.signal); }
+    try { await onAuthenticate(mode,{username,password,...(register?{confirmation:String(data.get('confirmation') || ''),email:String(data.get('email') || '').trim(),code:String(data.get('code') || '').trim()}:{})},controller.signal); }
     catch (cause) { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '暂时无法登录，请重试。'); }
     finally { if (!controller.signal.aborted) { pending.current=null; setBusy(false); } }
   }
   function changeMode() {
-    if (busy) return;
-    formRef.current?.reset(); setError(''); setMode(register ? 'login':'register');
+    if (busy || sending) return;
+    formRef.current?.reset(); setError('');setNotice(''); setMode(register ? 'login':'register');
   }
   return (
     <section data-slot="login" className="auth-page relative min-h-svh overflow-hidden bg-background lg:grid lg:grid-cols-2">
@@ -133,17 +160,27 @@ export default function Login03({onHome,onAuthenticate,onGithub}: Login03Props) 
             <p className="auth-intro">{register ? '创建账号，开始整理属于你的设计收藏。' : '登录设计图鉴，继续你的灵感收藏。'}</p>
           </div>
           <form id="auth-form" noValidate ref={formRef} onSubmit={submit} className={cn(ENTER,'auth-fields')} style={stagger(2)} aria-busy={busy}>
-            <label htmlFor="username">用户名</label>
-            <input id="username" name="username" autoComplete="username" autoFocus required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_]{3,32}" placeholder="输入用户名" aria-describedby={register ? 'username-help':undefined} disabled={busy}/>
-            {register ? <small id="username-help">3–32 位字母、数字或下划线，不区分大小写。</small> : null}
+            <label htmlFor="username">{register ? '显示名称' : '邮箱'}</label>
+            <input id="username" name="username" autoComplete={register ? 'nickname' : 'username'} autoFocus required minLength={1} maxLength={register ? 32 : 254} placeholder={register ? '输入显示名称' : '输入邮箱（旧账号可使用用户名）'} aria-describedby={register ? 'username-help':undefined} disabled={busy}/>
+            {register ? <small id="username-help">1–32 个字符，名称可以重复；邮箱用于登录。</small> : null}
+            {register ? <>
+              <label htmlFor="email">邮箱</label>
+              <input id="email" name="email" type="email" autoComplete="email" maxLength={254} placeholder="用于验证注册邮箱" disabled={busy || sending} onChange={()=>{setNotice('');const field=formRef.current?.elements.namedItem('code') as HTMLInputElement|null;if(field)field.value='';}}/>
+              <label htmlFor="email-code">邮箱验证码</label>
+              <div className="auth-code-row">
+                <input id="email-code" name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6 位验证码" disabled={busy} aria-describedby="email-code-notice"/>
+                <Button id="send-email-code" type="button" variant="outline" className="auth-code-send" onClick={()=>void sendCode()} disabled={busy || sending || cooldown>0}>{sending?'发送中…':cooldown>0?`${cooldown}s 后重发`:'发送验证码'}</Button>
+              </div>
+              <p id="email-code-notice" className="auth-code-notice" role="status">{notice}</p>
+            </> : null}
             <label htmlFor="password">密码</label>
             <input id="password" name="password" type="password" autoComplete={register?'new-password':'current-password'} required minLength={10} maxLength={128} placeholder="输入密码（10–128 位）" disabled={busy}/>
             {register ? <><label htmlFor="confirm-password">确认密码</label><input id="confirm-password" name="confirmation" type="password" autoComplete="new-password" required minLength={10} maxLength={128} placeholder="再次输入密码" disabled={busy}/></> : null}
             <p id="auth-status" role="status" aria-live="polite">{error || (busy ? (register?'正在创建你的设计库…':'正在登录…'):'')}</p>
-            <Button id="auth-submit" type="submit" size="lg" disabled={busy} className="auth-submit w-full gap-2">{busy ? <Loader2 className="animate-spin" size={16} aria-hidden="true"/>:null}{register?'创建账号':'Sign in'}</Button>
+            <Button id="auth-submit" type="submit" size="lg" disabled={busy || sending} className="auth-submit w-full gap-2">{busy ? <Loader2 className="animate-spin" size={16} aria-hidden="true"/>:null}{register?'创建账号':'Sign in'}</Button>
           </form>
           {onGithub ? <Button type="button" variant="outline" className="w-full gap-2" disabled={busy} onClick={async()=>{setBusy(true);setError('');try{await onGithub();}catch(cause){setError(cause instanceof Error?cause.message:'GitHub 登录失败。');}finally{setBusy(false);}}}><GithubIcon width={18} height={18}/>Continue with GitHub</Button>:null}
-          <p className="auth-switch">{register?'已有账号？':'还没有账号？'}<button id={register?'login-tab':'register-tab'} type="button" onClick={changeMode} disabled={busy}>{register?'立即登录':'创建账号'}</button></p>
+          <p className="auth-switch">{register?'已有账号？':'还没有账号？'}<button id={register?'login-tab':'register-tab'} type="button" onClick={changeMode} disabled={busy || sending}>{register?'立即登录':'创建账号'}</button></p>
           <p className="auth-note">{register?'注册后，你将获得一份独立的初始设计库。':'也可以返回设计库，继续浏览公开设计。'}</p>
         </div>
       </div>

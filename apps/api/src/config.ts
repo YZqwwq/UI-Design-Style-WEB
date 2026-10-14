@@ -1,3 +1,4 @@
+import { readMailConfig } from './mail.js';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parse } from 'dotenv';
@@ -55,7 +56,10 @@ export async function loadConfig(root = repositoryRoot, environment: DatabaseEnv
       origins = [parsed.origin];
     } catch { throw new ConfigurationError('APP_ORIGIN 必须是完整站点源地址，不含路径或结尾斜杠'); }
   }
+  let mail;
+  try { mail = readMailConfig(file); } catch { throw new ConfigurationError("邮件配置无效，请核对服务商、地域、发信地址和回信设置。"); }
   return {
+    mail,
     environment,
     origins,
     secureCookie: origins.every(origin => origin.startsWith('https://')),
